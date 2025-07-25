@@ -1,27 +1,31 @@
-# === ansible/roles/client/tasks/main.yml ===
-- name: Löse Zeitproblem komplett
-  block:
-    - name: Setze APT Konfiguration für Zeittoleranz
-      copy:
-        dest: /etc/apt/apt.conf.d/99time-fix
-        content: |
-          Acquire::Check-Valid-Until "false";
-          Acquire::Max-ValidTime "86400";
-      
-    - name: Bereinige APT komplett
-      shell: |
-        apt-get clean
-        rm -rf /var/lib/apt/lists/*
-        
-    - name: Forciere APT Update mit Zeittoleranz
-      shell: apt-get update --allow-releaseinfo-change
-      
-    - name: Synchronisiere Zeit im Hintergrund
-      shell: |
-        timedatectl set-ntp true
-        systemctl restart systemd-timesyncd
-      async: 30
-      poll: 0
-      
-  become: yes
-  ignore_errors: yes
+- name: Set timezone to Europe/London
+  ansible.builtin.timezone:
+    name: Europe/London
+
+- name: Install chrony for NTP
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: yes
+
+- name: Start and enable chrony
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: yes
+
+- name: Wait briefly until time is synchronized
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: Check current system time
+  ansible.builtin.command: date
+  register: current_time
+
+- name: Show current time
+  ansible.builtin.debug:
+    var: current_time.stdout
+
+- name: APT update
+  ansible.builtin.apt:
+    update_cache: yes

@@ -1,4 +1,4 @@
-- name: Installiere Abhängigkeiten für Stubby und getdns
+- name: Install dependencies for Stubby and getdns
   apt:
     name:
       - git
@@ -19,12 +19,12 @@
     state: present
     update_cache: yes
 
-- name: Klone getdns Repository
+- name: Clone getdns repository
   git:
     repo: https://github.com/getdnsapi/getdns.git
     dest: /opt/getdns
 
-- name: Baue und installiere Stubby
+- name: Build and install Stubby
   shell: |
     cd /opt/getdns
     mkdir -p build && cd build
@@ -35,7 +35,7 @@
   args:
     creates: /usr/local/bin/stubby
 
-- name: Erstelle Stubby-Konfigurationsverzeichnis
+- name: Create Stubby configuration directory
   file:
     path: /usr/local/etc/stubby
     state: directory
@@ -43,7 +43,7 @@
     group: root
     mode: '0755'
 
-- name: Setze Stubby-Konfigurationsdatei
+- name: Set Stubby configuration file
   copy:
     dest: /usr/local/etc/stubby/stubby.yml
     content: |
@@ -60,9 +60,8 @@
           tls_auth_name: "resolver.local"
           tls_port: 853
 
-- name: Trage Resolver-Hostnamen in /etc/hosts ein
+- name: Add resolver hostname to /etc/hosts
   lineinfile:
     path: /etc/hosts
     line: "192.168.56.11 resolver.local"
     state: present
-
