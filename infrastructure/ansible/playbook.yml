@@ -1,0 +1,17 @@
+- hosts: client
+  become: yes
+  roles:
+    - timesync
+    - client
+
+- hosts: resolver
+  become: yes
+  roles:
+    - timesync
+    - resolver
+
+- hosts: sniffer
+  become: yes
+  roles:
+    - timesync
+    - sniffer

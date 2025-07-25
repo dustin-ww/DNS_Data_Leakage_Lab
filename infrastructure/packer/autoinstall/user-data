@@ -1,0 +1,31 @@
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: packerubuntu
+    username: admin
+    password: "$6$dFt/2IU/bKpN.JTJ$nj.6E.k0gUbvqbbR.Dwts.RxDUFmvq7UeDxQ8eil0tkKNn3ip5DW3hi3v3dkBp1jMtrx7dWIVNIQo.R7Gibsj0"
+  ssh:
+    install-server: yes
+    allow-pw: true
+  network:
+    version: 2
+    ethernets:
+      enp0s3:
+        dhcp4: true
+        dhcp6: false
+  storage:
+    layout:
+      name: lvm
+  packages:
+    - openssh-server
+    - software-properties-common
+  output:
+    init: "> /var/log/cloud-init.log"
+    config: [ ">> /tmp/foo.out", "> /var/log/cloud-config.log" ]
+  late-commands:
+    - 'echo "admin ALL=(ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/admin'
+    - 'chmod 440 /target/etc/sudoers.d/admin'
+    # jetzt SSH explizit aktivieren und starten
+    - 'curtin in-target --target=/target -- systemctl enable ssh.service'
+    - 'curtin in-target --target=/target -- systemctl start ssh.service'

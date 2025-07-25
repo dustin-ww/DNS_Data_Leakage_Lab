@@ -1,0 +1,120 @@
+---
+- name: Installiere Unbound und OpenSSL
+  apt:
+    name:
+      - unbound
+      - openssl
+      - dnsutils
+    state: present
+    update_cache: yes
+
+- name: Stoppe Unbound vor Konfiguration
+  service:
+    name: unbound
+    state: stopped
+  ignore_errors: yes
+
+- name: Erstelle TLS-Zertifikatsverzeichnis
+  file:
+    path: /etc/unbound/tls
+    state: directory
+    mode: '0755'
+    owner: unbound
+    group: unbound
+
+- name: Generiere self-signed TLS-Zertifikat für Unbound
+  shell: |
+    openssl req -x509 -newkey rsa:2048 -nodes \
+      -keyout /etc/unbound/tls/unbound.key \
+      -out /etc/unbound/tls/unbound.crt \
+      -days 365 -subj "/CN=resolver.local"
+  args:
+    creates: /etc/unbound/tls/unbound.crt
+
+- name: Setze korrekte Berechtigungen für TLS-Dateien
+  file:
+    path: "{{ item }}"
+    owner: unbound
+    group: unbound
+    mode: '0600'
+  loop:
+    - /etc/unbound/tls/unbound.key
+    - /etc/unbound/tls/unbound.crt
+
+- name: Backup der ursprünglichen Unbound-Konfiguration
+  copy:
+    src: /etc/unbound/unbound.conf
+    dest: /etc/unbound/unbound.conf.backup
+    remote_src: yes
+  ignore_errors: yes
+
+- name: Schreibe Unbound-Konfiguration
+  copy:
+    dest: /etc/unbound/unbound.conf
+    content: |
+      server:
+        verbosity: 1
+        interface: 0.0.0.0
+        port: 53
+        do-tcp: yes
+        do-udp: yes
+        do-ip4: yes
+        do-ip6: no
+        
+        # TLS-Konfiguration
+        tls-port: 853
+        tls-service-key: "/etc/unbound/tls/unbound.key"
+        tls-service-pem: "/etc/unbound/tls/unbound.crt"
+        
+        # Sicherheitseinstellungen
+        access-control: 0.0.0.0/0 allow
+        hide-identity: yes
+        hide-version: yes
+        
+        # Cache-Einstellungen
+        cache-min-ttl: 3600
+        cache-max-ttl: 86400
+        
+        # Root-Hints (optional, für bessere Performance)
+        # root-hints: "/var/lib/unbound/root.hints"
+        
+      # Forward-Zone für DNS-over-TLS
+      forward-zone:
+        name: "."
+        forward-addr: 1.1.1.1@853
+        forward-addr: 1.0.0.1@853
+        forward-ssl-upstream: yes
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Teste Unbound-Konfiguration
+  command: unbound-checkconf /etc/unbound/unbound.conf
+  register: unbound_config_test
+  failed_when: unbound_config_test.rc != 0
+
+- name: Starte und aktiviere Unbound
+  service:
+    name: unbound
+    state: started
+    enabled: yes
+
+- name: Warte auf Unbound-Start
+  wait_for:
+    port: 53
+    host: 127.0.0.1
+    timeout: 30
+
+- name: Teste DNS-Auflösung
+  command: dig @127.0.0.1 google.com
+  register: dns_test
+  failed_when: "'ANSWER SECTION' not in dns_test.stdout"
+
+- name: Teste DNS-over-TLS (falls Port 853 verfügbar)
+  command: dig @127.0.0.1 -p 853 +tls google.com
+  register: dot_test
+  ignore_errors: yes
+
+- name: Zeige DNS-over-TLS Test-Ergebnis
+  debug:
+    msg: "DNS-over-TLS Test: {{ 'Erfolgreich' if dot_test.rc == 0 else 'Fehlgeschlagen' }}"

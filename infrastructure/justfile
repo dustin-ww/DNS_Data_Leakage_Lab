@@ -1,0 +1,20 @@
+# justfile
+set shell := ["bash", "-cu"]
+
+# Full Installation of the DNS Data Leakage Lab
+install:
+    vagrant up
+    ./ansible/create_inventory.sh
+    ansible-playbook -i hosts_dynamic.ini ./ansible/playbook.yml
+
+ansible:
+    ./ansible/create_inventory.sh
+    ansible-playbook -i hosts_dynamic.ini ./ansible/playbook.yml
+
+
+full-vb-build:
+    #cd ./packer && packer build virtualbox-ubuntu-24.pkr.hcl
+    #cd ./packer && vagrant box add basic-ubuntu24 ./vagrant_output/basic-ubuntu24.box --provider virtualbox --force
+    #cd vagrant && vagrant up
+    cd ./vagrant && ./create_inventory.sh
+    ansible-playbook -i hosts_dynamic.ini ./ansible/playbook.yml

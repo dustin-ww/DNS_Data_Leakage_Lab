@@ -1,0 +1,20 @@
+# === ansible/roles/sniffer/tasks/main.yml ===
+- name: Installiere tcpdump, tshark und Zeek
+  apt:
+    name:
+      - tcpdump
+      - tshark
+      - zeek
+      - vim
+    state: present
+    update_cache: yes
+
+- name: Erstelle Capture-Verzeichnis
+  file:
+    path: /opt/captures
+    state: directory
+    mode: '0755'
+
+- name: Hinweis auf manuelle Nutzung
+  debug:
+    msg: "Sniffer bereit. Beispiel: tcpdump -i eth1 -w /opt/captures/dot.pcap"

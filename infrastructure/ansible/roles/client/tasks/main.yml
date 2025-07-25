@@ -1,0 +1,68 @@
+- name: Installiere Abhängigkeiten für Stubby und getdns
+  apt:
+    name:
+      - git
+      - build-essential
+      - cmake
+      - libtool
+      - libssl-dev
+      - libevent-dev
+      - libyaml-dev
+      - libuv1-dev
+      - libexpat1-dev
+      - autoconf
+      - automake
+      - pkg-config
+      - curl
+      - vim
+      - dnsutils
+    state: present
+    update_cache: yes
+
+- name: Klone getdns Repository
+  git:
+    repo: https://github.com/getdnsapi/getdns.git
+    dest: /opt/getdns
+
+- name: Baue und installiere Stubby
+  shell: |
+    cd /opt/getdns
+    mkdir -p build && cd build
+    cmake -DENABLE_STUBBY=ON ..
+    make -j$(nproc)
+    make install
+    ldconfig
+  args:
+    creates: /usr/local/bin/stubby
+
+- name: Erstelle Stubby-Konfigurationsverzeichnis
+  file:
+    path: /usr/local/etc/stubby
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Setze Stubby-Konfigurationsdatei
+  copy:
+    dest: /usr/local/etc/stubby/stubby.yml
+    content: |
+      resolution_type: GETDNS_RESOLUTION_STUB
+      dns_transport_list:
+        - GETDNS_TRANSPORT_TLS
+      tls_authentication: GETDNS_AUTHENTICATION_REQUIRED
+      round_robin_upstreams: 1
+      idle_timeout: 10000
+      listen_addresses:
+        - 127.0.0.1
+      upstream_recursive_servers:
+        - address_data: 192.168.56.11
+          tls_auth_name: "resolver.local"
+          tls_port: 853
+
+- name: Trage Resolver-Hostnamen in /etc/hosts ein
+  lineinfile:
+    path: /etc/hosts
+    line: "192.168.56.11 resolver.local"
+    state: present
+
