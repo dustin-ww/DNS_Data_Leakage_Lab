@@ -18,3 +18,7 @@ full-vb-build:
     #cd vagrant && vagrant up
     cd ./vagrant && ./create_inventory.sh
     ansible-playbook -i hosts_dynamic.ini ./ansible/playbook.yml
+
+start: 
+    cd ./vagrant && vagrant up
+    ansible-playbook -i hosts_dynamic.ini ./ansible/playbook.yml

@@ -1,36 +1,32 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "debian/bookworm64"
 
-  # config.ssh.username    = "admin"
-  # config.ssh.password    = "packerubuntu"    
-  # config.ssh.insert_key  = false           
-  # config.ssh.pty         = true   
-  # config.vm.synced_folder ".", "/vagrant", disabled: true
-
-  # Gemeinsame Konfiguration
+  # Shared configuration for all VMs
   config.vm.provider "virtualbox" do |vb|
     vb.memory = 2048
     vb.cpus = 2
+    # Important for network interfaces to work properly (regarding sniffing traffic)
+    #vb.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
   end
 
-  # Client-VM
+  # Client 
   config.vm.define "client" do |client|
     client.vm.hostname = "client"
     client.vm.network "private_network", ip: "192.168.56.10"
     client.vm.provision "shell", inline: "apt update && apt upgrade -y"
   end
 
-  # Resolver-VM
-  config.vm.define "resolver" do |resolver|
-    resolver.vm.hostname = "resolver"
-    resolver.vm.network "private_network", ip: "192.168.56.11"
-    resolver.vm.provision "shell", inline: "apt update && apt upgrade -y"
-  end
+  # # Resolver
+  # config.vm.define "resolver" do |resolver|
+  #   resolver.vm.hostname = "resolver"
+  #   resolver.vm.network "private_network", ip: "192.168.56.11"
+  #   resolver.vm.provision "shell", inline: "apt update && apt upgrade -y"
+  # end
 
-  # Sniffer-VM
-  config.vm.define "sniffer" do |sniffer|
-    sniffer.vm.hostname = "sniffer"
-    sniffer.vm.network "private_network", ip: "192.168.56.12"
-    sniffer.vm.provision "shell", inline: "apt update && apt upgrade -y"
-  end
+  # # Sniffer
+  # config.vm.define "sniffer" do |sniffer|
+  #   sniffer.vm.hostname = "sniffer"
+  #   sniffer.vm.network "private_network", ip: "192.168.56.12"
+  #   sniffer.vm.provision "shell", inline: "apt update && apt upgrade -y"
+  # end
 end

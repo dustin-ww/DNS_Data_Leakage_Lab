@@ -67,3 +67,5 @@ collections/
 
 vagrant-ssh-config
 *.box
+
+tranco*

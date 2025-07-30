@@ -1,17 +1,19 @@
+# - hosts: resolver
+#   become: yes
+#   roles:
+#     - timesync
+#     - resolver
+
 - hosts: client
   become: yes
+  vars:
+    ansible_shell_executable: /bin/bash
   roles:
     - timesync
     - client
 
-- hosts: resolver
-  become: yes
-  roles:
-    - timesync
-    - resolver
-
-- hosts: sniffer
-  become: yes
-  roles:
-    - timesync
-    - sniffer
+# - hosts: sniffer
+#   become: yes
+#   roles:
+#     - timesync
+#     - sniffer
