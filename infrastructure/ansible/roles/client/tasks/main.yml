@@ -85,7 +85,7 @@
       mkdir -p "$LOGDIR"
 
       # Nur DNS-over-TLS Traffic (Port 853)
-      exec /usr/bin/tcpdump -i any -w "$LOGDIR/dns_traffic.pcap" port 853
+      exec /usr/bin/tcpdump -i eth0 -w "$LOGDIR/dns_traffic.pcap" -s 0 -U port 853
 
 - name: Configure Stubby for Quad9
   copy:

@@ -69,3 +69,5 @@ vagrant-ssh-config
 *.box
 
 tranco*
+*.csv
+*.pcap

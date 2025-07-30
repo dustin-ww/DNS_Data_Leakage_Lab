@@ -1,120 +1,44 @@
 #!/usr/bin/env python3
-"""
-Minimales Selenium Script mit DoH/DoT
-pip install selenium requests
-"""
+import dns.message
+import dns.query
+import dns.rdatatype
+import time
+import pandas as pd
 
-import requests
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-
-class MinimalDoHBrowser:
-    def __init__(self):
-        self.doh_url = 'https://1.1.1.1/dns-query'
-        self.driver = None
-    
-    def resolve_doh(self, domain):
-        """DNS über HTTPS auflösen"""
-        try:
-            response = requests.get(
-                self.doh_url,
-                headers={'Accept': 'application/dns-json'},
-                params={'name': domain, 'type': 'A'},
-                timeout=5
-            )
-            data = response.json()
-            if 'Answer' in data:
-                return [answer['data'] for answer in data['Answer']]
-            return []
-        except Exception as e:
-            print(f"DoH Fehler: {e}")
-            return []
-    
-    def setup_browser(self):
-        """Chrome mit DoH starten"""
-        options = Options()
-        options.add_argument('--headless')
-        options.add_argument('--enable-features=DnsOverHttps')
-        options.add_argument('--force-dns-over-https-template=https://1.1.1.1/dns-query')
-        
-        self.driver = webdriver.Chrome(options=options)
-        return self.driver
-    
-    def visit(self, url):
-        """Website besuchen"""
-        from urllib.parse import urlparse
-        domain = urlparse(url).netloc
-        
-        # DNS vorab auflösen
-        ips = self.resolve_doh(domain)
-        print(f"{domain} -> {ips}")
-        
-        # Website besuchen
-        self.driver.get(url)
-        print(f"Titel: {self.driver.title}")
-        return self.driver.title
-    
-    def close(self):
-        if self.driver:
-            self.driver.quit()
-
-# Tranco CSV verarbeiten
 def process_tranco_csv(csv_file, limit=100):
-    """Erste N Domains aus Tranco CSV laden"""
-    import csv
-    domains = []
-    
     try:
-        with open(csv_file, 'r') as f:
-            reader = csv.reader(f)
-            for i, row in enumerate(reader):
-                if i >= limit:
-                    break
-                if len(row) >= 2:  # Tranco Format: rank,domain
-                    domains.append(row[1])
+        df = pd.read_csv(csv_file, header=None, usecols=[1], nrows=limit)
+        return df[1].tolist()
     except Exception as e:
-        print(f"CSV Fehler: {e}")
-    
-    return domains
+        print(f"CSV error: {e}")
+        return []
 
-# Verwendung
-if __name__ == "__main__":
-    # Tranco CSV Datei angeben
-    tranco_file = "tranco_list.csv"  # Pfad zu deiner Tranco CSV
-    
-    # Erste 100 Domains laden
-    domains = process_tranco_csv(tranco_file, 100)
-    print(f"Geladene Domains: {len(domains)}")
-    
-    if not domains:
-        print("Keine Domains gefunden. Verwende Beispiel-Domains:")
-        domains = ['google.com', 'youtube.com', 'facebook.com']
-    
-    browser = MinimalDoHBrowser()
-    browser.setup_browser()
-    
-    results = []
-    
+def resolve_dot(domain, server='9.9.9.9', port=853):
+    """DNS over TLS query"""
     try:
-        for i, domain in enumerate(domains, 1):
-            print(f"\n[{i}/{len(domains)}] Teste: {domain}")
-            try:
-                url = f"https://{domain}"
-                title = browser.visit(url)
-                results.append({'domain': domain, 'title': title, 'status': 'success'})
-            except Exception as e:
-                print(f"Fehler bei {domain}: {e}")
-                results.append({'domain': domain, 'title': None, 'status': 'error'})
-    
-    finally:
-        browser.close()
-        
-        # Ergebnisse ausgeben
-        print(f"\n=== Zusammenfassung ===")
-        successful = sum(1 for r in results if r['status'] == 'success')
-        print(f"Erfolgreich: {successful}/{len(results)}")
-        
-        # Erste 10 Ergebnisse anzeigen
-        for result in results[:10]:
-            status = "✓" if result['status'] == 'success' else "✗"
-            print(f"{status} {result['domain']}: {result['title']}")
+        query = dns.message.make_query(domain, dns.rdatatype.A)
+        response = dns.query.tls(query, server, port=port, timeout=5)
+        ips = []
+        if response.answer:
+            for ans in response.answer:
+                for item in ans.items:
+                    ips.append(item.to_text())
+        return ips
+    except Exception as e:
+        print(f"DoT error for {domain}: {e}")
+        return []
+
+if __name__ == "__main__":
+    # Path to the recent tranco top list
+    tranco_file = "./data/tranco_july-25-1m.csv/top-1m.csv"
+    domains = process_tranco_csv(tranco_file, 100)
+
+    if not domains:
+        print("No domains found. Using sample domains:")
+        domains = ['google.com', 'youtube.com', 'facebook.com']
+
+    for i, domain in enumerate(domains, 1):
+        print(f"[{i}/{len(domains)}] Resolving {domain} via DoT")
+        ips = resolve_dot(domain)
+        print(f"{domain} -> {ips}")
+        time.sleep(30)
