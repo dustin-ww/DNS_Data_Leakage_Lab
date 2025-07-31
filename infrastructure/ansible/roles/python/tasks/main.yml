@@ -1,0 +1,22 @@
+- name: Ensure Python 3 and pip are installed
+  ansible.builtin.apt:
+    name: python3-pip
+    state: present
+    update_cache: true
+  become: true
+
+- name: Install required Python packages
+  ansible.builtin.apt:
+    name:
+      - python3-dnspython
+      - python3-pandas
+    state: present
+    update_cache: true
+  become: true
+
+
+- name: Copy DNS Client Script to /var/log/dns
+  copy:
+    src: ./../../client.py
+    dest: /var/log/dns/client.py
+    mode: '0644'

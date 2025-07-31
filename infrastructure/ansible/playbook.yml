@@ -1,19 +1,61 @@
-# - hosts: resolver
-#   become: yes
-#   roles:
-#     - timesync
-#     - resolver
-
 - hosts: client
   become: yes
   vars:
     ansible_shell_executable: /bin/bash
+
+  pre_tasks:
+    - name: Update APT Cache and Packages
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600 
+
+    - name: Install Basic Dependencies and Runtime Packages
+      apt:
+        name:
+          - systemd-resolved
+          - dnsutils 
+          - git
+        state: present
+        update_cache: yes
+
+    - name: Set Temporary DNS Server for Internet Access
+      lineinfile:
+        path: /etc/systemd/resolved.conf
+        line: "DNS=9.9.9.9"
+        state: present
+    
+    - name: Restart systemd-resolved
+      systemd:
+        name: systemd-resolved
+        state: restarted
+    
+    # Temp Directory for Measurements
+    - name: Create DNS logging directory
+      file:
+        path: "/var/log/dns"
+        state: directory
+        mode: '0755'
+
+
   roles:
     - timesync
-    - client
+    - stubby
+    - tcpdump
+    - python
+    - tranco
 
-# - hosts: sniffer
-#   become: yes
-#   roles:
-#     - timesync
-#     - sniffer
+  post_tasks:
+    - name: Enable & start core DNS services
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - stubby
+        - systemd-resolved
+
+    - name: Enable & start dns-monitor
+      systemd:
+        name: dns-monitor
+        enabled: yes
+        state: started

@@ -41,12 +41,12 @@ def run_tcpdump(interface='eth0', output_file='/opt/captures/dot.pcap'):
 
 if __name__ == "__main__":
     # Path to the recent tranco top list
-    tranco_file = "./data/tranco_july-25-1m.csv/top-1m.csv"
+    tranco_file = "./data/tranco/tranco_top_1m.csv"
     domains = process_tranco_csv(tranco_file, 100)
 
     for i, domain in enumerate(domains, 1):
         print(f"[{i}/{len(domains)}] Resolving {domain} via DoT")
-        dump_proc = run_tcpdump(output_file=f"/opt/captures/dot_{domain}.pcap")
+        dump_proc = run_tcpdump(output_file=f"./test/dot_{domain}.pcap")
         
         ips = resolve_dot(domain)
         print(f"{domain} -> {ips}")

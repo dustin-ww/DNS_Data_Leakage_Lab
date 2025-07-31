@@ -1,7 +1,4 @@
----
-# tasks/main.yml
-
-- name: Install build dependencies and runtime packages
+- name: Install stubby build dependencies and runtime packages
   apt:
     name:
       - build-essential
@@ -11,24 +8,8 @@
       - libssl-dev
       - libsystemd-dev
       - pkg-config
-      - systemd-resolved
-      - tcpdump      # nur für dns-capture
-      - dnsutils     # optional: dig, nslookup
-      - git
     state: present
     update_cache: yes
-
-# (Optional) temporären DNS setzen, damit APT/Git etc. funktionieren
-- name: Temporären DNS-Server setzen (für Internetzugriff)
-  lineinfile:
-    path: /etc/systemd/resolved.conf
-    line: "DNS=9.9.9.9"
-    state: present
-
-- name: Restart systemd-resolved now
-  systemd:
-    name: systemd-resolved
-    state: restarted
 
 - name: Clone and build Stubby from source
   block:
@@ -60,32 +41,11 @@
         chdir: /tmp/stubby/build
         creates: /usr/local/bin/stubby
 
-- name: Ensure directories exist
-  block:
     - name: Ensure Stubby config directory exists
       file:
         path: "/usr/local/etc/stubby"
         state: directory
         mode: '0755'
-
-    - name: Create DNS logging directory
-      file:
-        path: "/var/log/dns"
-        state: directory
-        mode: '0755'
-
-- name: Install DNS capture script
-  copy:
-    dest: "/usr/local/bin/dns-capture"
-    mode: '0755'
-    content: |
-      #!/bin/bash
-      set -euo pipefail
-      LOGDIR="/var/log/dns"
-      mkdir -p "$LOGDIR"
-
-      # Nur DNS-over-TLS Traffic (Port 853)
-      exec /usr/bin/tcpdump -i eth0 -w "$LOGDIR/dns_traffic.pcap" -s 0 -U port 853
 
 - name: Configure Stubby for Quad9
   copy:
@@ -165,33 +125,6 @@
     home: /var/lib/stubby
     create_home: no
 
-- name: Create dns-monitor service (only this custom unit is needed)
-  copy:
-    dest: /etc/systemd/system/dns-monitor.service
-    mode: '0644'
-    content: |
-      [Unit]
-      Description=DNS Traffic Monitor
-      Wants=stubby.service systemd-resolved.service network-online.target
-      After=stubby.service systemd-resolved.service network-online.target
-      PartOf=stubby.service
-
-      [Service]
-      Type=simple
-      ExecStart=/usr/local/bin/dns-capture
-      KillSignal=SIGINT
-      Restart=on-failure
-      RestartSec=5
-      # Optional: unter eigenem Benutzer mit CAP_NET_RAW (wenn tcpdump setcap hat)
-      # User=_tcpdump
-      # AmbientCapabilities=CAP_NET_RAW
-      # CapabilityBoundingSet=CAP_NET_RAW
-
-      [Install]
-      WantedBy=multi-user.target
-
-  notify: Reload systemd
-
 - name: Configure systemd-resolved to forward to Stubby
   block:
     - name: Ensure resolved drop-in directory exists
@@ -224,25 +157,6 @@
     dest: /etc/resolv.conf
     state: link
     force: yes
-
-- name: Reload systemd (for services)
-  systemd:
-    daemon_reload: yes
+  notify: Reload systemd
 
 - meta: flush_handlers
-
-- name: Enable & start core DNS services
-  systemd:
-    name: "{{ item }}"
-    enabled: yes
-    state: started
-  loop:
-    - stubby
-    - systemd-resolved
-
-# dns-monitor erst danach
-- name: Enable & start dns-monitor
-  systemd:
-    name: dns-monitor
-    enabled: yes
-    state: started
