@@ -36,14 +36,15 @@
         state: directory
         mode: '0755'
 
-
   roles:
-    - timesync
-    - stubby
-    - tcpdump
-    - python
-    - tranco
+    # - timesync
+    # - stubby
+    # - tcpdump
+    # - python
+    # - tranco
+    - dnsproxy
 
+  # Enable and start all services after setting configs with roles
   post_tasks:
     - name: Enable & start core DNS services
       systemd:
@@ -51,6 +52,7 @@
         enabled: yes
         state: started
       loop:
+        - dnsproxy
         - stubby
         - systemd-resolved
 

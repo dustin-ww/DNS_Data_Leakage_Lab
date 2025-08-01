@@ -1,0 +1,10 @@
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+
+- name: Restart dnsproxy
+  become: yes
+  service:
+    name: dnsproxy
+    state: restarted

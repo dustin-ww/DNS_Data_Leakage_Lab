@@ -1,0 +1,173 @@
+- name: Install stubby build dependencies and runtime packages
+  apt:
+    name:
+      - sslsplit
+    state: present
+    update_cache: yes
+
+- name: Create sslsplit certificates directory
+  file:
+    path: "/etc/sslsplit/certs"
+    state: directory
+    mode: '0755'
+
+- name: Create sslsplit logs directory
+  file:
+    path: "/var/log/sslsplit"
+    state: directory
+    mode: '0755'
+
+- name: Generate CA certificate for sslsplit
+  block:
+    - name: Generate CA private key
+      command: openssl genrsa -out /etc/sslsplit/certs/ca-key.pem 4096
+      args:
+        creates: /etc/sslsplit/certs/ca-key.pem
+
+    - name: Generate CA certificate
+      command: >
+        openssl req -new -x509 -days 3650 -key /etc/sslsplit/certs/ca-key.pem
+        -out /etc/sslsplit/certs/ca-cert.pem
+        -subj "/C=DE/ST=SH/L=HH/O=DNS-Research/CN=sslsplit-ca"
+      args:
+        creates: /etc/sslsplit/certs/ca-cert.pem
+
+    - name: Generate server private key
+      command: openssl genrsa -out /etc/sslsplit/certs/server-key.pem 2048
+      args:
+        creates: /etc/sslsplit/certs/server-key.pem
+
+    - name: Create server certificate config
+      copy:
+        dest: /etc/sslsplit/certs/server.conf
+        content: |
+          [req]
+          distinguished_name = req_distinguished_name
+          req_extensions = v3_req
+          prompt = no
+
+          [req_distinguished_name]
+          C = DE
+          ST = SH
+          L = HH
+          O = DNS-Research
+          CN = dns.quad9.net
+
+          [v3_req]
+          keyUsage = keyEncipherment, dataEncipherment
+          extendedKeyUsage = serverAuth
+          subjectAltName = @alt_names
+
+          [alt_names]
+          DNS.1 = dns.quad9.net
+          DNS.2 = *.quad9.net
+          IP.1 = 127.0.0.1
+          IP.2 = 9.9.9.9
+          IP.3 = 149.112.112.112
+
+    - name: Generate server certificate request
+      command: >
+        openssl req -new -key /etc/sslsplit/certs/server-key.pem
+        -out /etc/sslsplit/certs/server.csr
+        -config /etc/sslsplit/certs/server.conf
+      args:
+        creates: /etc/sslsplit/certs/server.csr
+
+    - name: Sign server certificate
+      command: >
+        openssl x509 -req -in /etc/sslsplit/certs/server.csr
+        -CA /etc/sslsplit/certs/ca-cert.pem
+        -CAkey /etc/sslsplit/certs/ca-key.pem
+        -CAcreateserial -out /etc/sslsplit/certs/server-cert.pem
+        -days 365 -extensions v3_req
+        -extfile /etc/sslsplit/certs/server.conf
+      args:
+        creates: /etc/sslsplit/certs/server-cert.pem
+
+- name: Create sslsplit configuration
+  copy:
+    dest: "/etc/sslsplit/sslsplit.conf"
+    mode: '0644'
+    content: |
+      # sslsplit configuration for DoT proxy
+      listen = 127.0.0.1:8853
+      
+      # Upstream DoT servers (Quad9)
+      upstream = 9.9.9.9:853
+      upstream = 149.112.112.112:853
+      
+      # TLS certificate for proxy
+      cert = /etc/sslsplit/certs/server-cert.pem
+      key = /etc/sslsplit/certs/server-key.pem
+      
+      # Logging
+      logdir = /var/log/sslsplit
+      logkeys = /var/log/sslsplit/keys.log
+      
+      # Connection settings
+      timeout = 30
+      
+      # Enable detailed logging
+      verbose = true
+
+- name: Create sslsplit user
+  user:
+    name: sslsplit
+    system: yes
+    shell: /usr/sbin/nologin
+    home: /var/lib/sslsplit
+    create_home: no
+
+- name: Set correct ownership and permissions for sslsplit certificates
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('sslsplit') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: '/etc/sslsplit/certs', mode: '0750' }
+    - { path: '/etc/sslsplit/certs/ca-cert.pem', mode: '0640' }
+    - { path: '/etc/sslsplit/certs/ca-key.pem', mode: '0640' }
+    - { path: '/etc/sslsplit/certs/server-cert.pem', mode: '0640' }
+    - { path: '/etc/sslsplit/certs/server-key.pem', mode: '0640' }
+    - { path: '/var/log/sslsplit', mode: '0750', owner: 'sslsplit' }
+
+- name: Create sslsplit systemd service
+  copy:
+    dest: /etc/systemd/system/sslsplit.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=SSL/TLS Split Proxy for DoT
+      Wants=network-online.target
+      After=network-online.target
+      Before=stubby.service
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/bin/sslsplit \
+        -k /etc/sslsplit/certs/server-key.pem \
+        -c /etc/sslsplit/certs/server-cert.pem \
+        -C /etc/sslsplit/certs/ca-cert.pem \
+        -K /etc/sslsplit/certs/ca-key.pem \
+        -l /var/log/sslsplit/connections.log \
+        -L /var/log/sslsplit/keys.log \
+        -D \
+        ssl 127.0.0.1 8853 9.9.9.9 853
+      StandardOutput=journal
+      StandardError=journal
+      KillSignal=SIGINT
+      Restart=on-failure
+      RestartSec=5
+      User=sslsplit
+      Group=sslsplit
+      AmbientCapabilities=CAP_NET_BIND_SERVICE
+      CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+      NoNewPrivileges=true
+      ReadWritePaths=/var/log/sslsplit
+      PrivateDevices=true
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Reload systemd

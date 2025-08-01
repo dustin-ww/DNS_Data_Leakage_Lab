@@ -47,7 +47,38 @@
         state: directory
         mode: '0755'
 
-- name: Configure Stubby for Quad9
+# - name: Configure Stubby for Quad9
+#   copy:
+#     dest: "/usr/local/etc/stubby/stubby.yml"
+#     mode: '0644'
+#     content: |
+#       resolution_type: GETDNS_RESOLUTION_STUB
+#       dns_transport_list:
+#         - GETDNS_TRANSPORT_TLS
+#       tls_authentication: GETDNS_AUTHENTICATION_REQUIRED
+#       round_robin_upstreams: 1
+#       idle_timeout: 10000
+#       listen_addresses:
+#         - 127.0.0.1@53
+#         - 127.0.0.1@853
+#       upstream_recursive_servers:
+#         - address_data: 9.9.9.9
+#           tls_auth_name: "dns.quad9.net"
+#           tls_port: 853
+#         - address_data: 149.112.112.112
+#           tls_auth_name: "dns.quad9.net"
+#           tls_port: 853
+#         - address_data: 2620:fe::fe
+#           tls_auth_name: "dns.quad9.net"
+#           tls_port: 853
+#         - address_data: 2620:fe::9
+#           tls_auth_name: "dns.quad9.net"
+#           tls_port: 853
+#       appdata_dir: "/var/log/dns"
+#       log_level: 7
+#   notify: Restart stubby
+
+- name: Configure Stubby to use Unbound proxy
   copy:
     dest: "/usr/local/etc/stubby/stubby.yml"
     mode: '0644'
@@ -55,29 +86,20 @@
       resolution_type: GETDNS_RESOLUTION_STUB
       dns_transport_list:
         - GETDNS_TRANSPORT_TLS
-      tls_authentication: GETDNS_AUTHENTICATION_REQUIRED
+      tls_authentication: GETDNS_AUTHENTICATION_NONE
       round_robin_upstreams: 1
       idle_timeout: 10000
       listen_addresses:
         - 127.0.0.1@53
-        - 127.0.0.1@853
+      # Stubby verbindet sich mit Unbound DoT Proxy
       upstream_recursive_servers:
-        - address_data: 9.9.9.9
-          tls_auth_name: "dns.quad9.net"
-          tls_port: 853
-        - address_data: 149.112.112.112
-          tls_auth_name: "dns.quad9.net"
-          tls_port: 853
-        - address_data: 2620:fe::fe
-          tls_auth_name: "dns.quad9.net"
-          tls_port: 853
-        - address_data: 2620:fe::9
-          tls_auth_name: "dns.quad9.net"
+        - address_data: 127.0.0.1
           tls_port: 853
       appdata_dir: "/var/log/dns"
       log_level: 7
   notify: Restart stubby
 
+  
 - name: Create stubby systemd service
   copy:
     dest: /etc/systemd/system/stubby.service
@@ -93,6 +115,9 @@
       [Service]
       Type=simple
       ExecStart=/usr/local/bin/stubby -C /usr/local/etc/stubby/stubby.yml
+      StandardOutput=journal
+      StandardError=journal
+
       KillSignal=SIGINT
       Restart=on-failure
       RestartSec=5

@@ -1,0 +1,4 @@
+# roles/dnsproxy/defaults/main.yml
+---
+dnsproxy_version: "v0.76.1"
+dnsproxy_url: "https://github.com/AdguardTeam/dnsproxy/releases/download/{{ dnsproxy_version }}/dnsproxy-linux-amd64-{{ dnsproxy_version }}.tar.gz"

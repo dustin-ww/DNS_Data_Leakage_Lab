@@ -1,0 +1,163 @@
+# roles/dnsproxy/tasks/main.yml
+---
+- name: Check if dnsproxy is already installed
+  stat:
+    path: /usr/bin/dnsproxy
+  register: dnsproxy
+
+- name: Create temporary directory for dnsproxy
+  tempfile:
+    state: directory
+    suffix: dnsproxy
+  register: tempdir
+  when: not dnsproxy.stat.exists
+
+- name: Download dnsproxy archive
+  get_url:
+    url: "{{ dnsproxy_url }}"
+    dest: "{{ tempdir.path }}/dnsproxy.tar.gz"
+  when: not dnsproxy.stat.exists
+
+- name: Extract dnsproxy archive
+  unarchive:
+    src: "{{ tempdir.path }}/dnsproxy.tar.gz"
+    dest: "{{ tempdir.path }}"
+    remote_src: yes
+  when: not dnsproxy.stat.exists
+
+- name: Move dnsproxy binary to /usr/bin
+  shell: >
+    mv "{{ tempdir.path }}"/*/dnsproxy /usr/bin/dnsproxy
+  args:
+    creates: /usr/bin/dnsproxy
+  when: not dnsproxy.stat.exists
+
+- name: Set permissions for dnsproxy binary
+  file:
+    path: /usr/bin/dnsproxy
+    mode: '0755'
+  when: not dnsproxy.stat.exists
+
+- name: Clean up temporary directory
+  file:
+    path: "{{ tempdir.path }}"
+    state: absent
+  when: not dnsproxy.stat.exists
+
+- name: Ensure DNSProxy log directory exists
+  file:
+    path: /var/log/dnsproxy
+    state: directory
+    owner: stubby
+    group: stubby
+    mode: '0755'
+
+- name: Ensure DNSProxy config directory exists
+  file:
+    path: /usr/local/etc/dnsproxy
+    state: directory
+    mode: '0755'
+
+- name: Ensure TLS directory exists
+  file:
+    path: /usr/local/etc/dnsproxy/tls
+    state: directory
+    owner: stubby
+    group: stubby
+    mode: '0755'
+
+# Remove existing certificates if they exist to regenerate with correct CN
+- name: Remove existing certificate files for regeneration
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/etc/dnsproxy/tls/dnsproxy.key
+    - /usr/local/etc/dnsproxy/tls/dnsproxy.csr
+    - /usr/local/etc/dnsproxy/tls/dnsproxy.crt
+    - /usr/local/share/ca-certificates/dnsproxy.crt
+  tags: regenerate_certs
+
+- name: Generate private key for DNSProxy
+  openssl_privatekey:
+    path: /usr/local/etc/dnsproxy/tls/dnsproxy.key
+    size: 2048
+    type: RSA
+    owner: stubby
+    group: stubby
+    mode: '0600'
+
+- name: Generate CSR for DNSProxy
+  openssl_csr:
+    path: /usr/local/etc/dnsproxy/tls/dnsproxy.csr
+    privatekey_path: /usr/local/etc/dnsproxy/tls/dnsproxy.key
+    common_name: "dnsproxy.local"
+    subject_alt_name:
+      - "DNS:dnsproxy.local"
+      - "DNS:{{ ansible_fqdn }}"
+      - "DNS:localhost"
+      - "IP:127.0.0.1"
+    owner: stubby
+    group: stubby
+    mode: '0644'
+
+- name: Generate self-signed certificate for DNSProxy
+  openssl_certificate:
+    path: /usr/local/etc/dnsproxy/tls/dnsproxy.crt
+    csr_path: /usr/local/etc/dnsproxy/tls/dnsproxy.csr
+    privatekey_path: /usr/local/etc/dnsproxy/tls/dnsproxy.key
+    provider: selfsigned
+    ownca_not_before: 0       
+    ownca_not_after: 365      
+    selfsigned_digest: sha256
+    owner: stubby
+    group: stubby
+    mode: '0644'
+
+
+- name: Install dnsproxy cert into system trust store
+  copy:
+    src: /usr/local/etc/dnsproxy/tls/dnsproxy.crt
+    dest: /usr/local/share/ca-certificates/dnsproxy.crt
+    owner: root
+    group: root
+    mode: '0644'
+    remote_src: yes
+
+- name: Update CA certificates
+  command: update-ca-certificates --fresh
+  changed_when: true
+
+- name: Create dnsproxy systemd service
+  copy:
+    dest: /etc/systemd/system/dnsproxy.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=DNSProxy: TLS-Termination & Logging
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/bin/dnsproxy \
+        -l 127.0.0.1 \
+        --tls-port=853 \
+        --tls-crt=/usr/local/etc/dnsproxy/tls/dnsproxy.crt \
+        --tls-key=/usr/local/etc/dnsproxy/tls/dnsproxy.key \
+        -u tls://dns11.quad9.net \
+        -o /var/log/dnsproxy/dnsproxy.log \
+        -v \
+        -p 0
+      Restart=on-failure
+      RestartSec=5
+      User=stubby
+      Group=stubby
+      AmbientCapabilities=CAP_NET_BIND_SERVICE
+      NoNewPrivileges=true
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: 
+    - Reload systemd
+    - Restart dnsproxy
