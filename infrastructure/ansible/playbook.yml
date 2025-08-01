@@ -37,11 +37,11 @@
         mode: '0755'
 
   roles:
-    # - timesync
-    # - stubby
-    # - tcpdump
-    # - python
-    # - tranco
+    - timesync
+    - stubby
+    - tcpdump
+    - python
+    - tranco
     - dnsproxy
 
   # Enable and start all services after setting configs with roles
