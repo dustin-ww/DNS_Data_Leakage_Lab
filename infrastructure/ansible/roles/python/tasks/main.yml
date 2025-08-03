@@ -10,6 +10,7 @@
     name:
       - python3-dnspython
       - python3-pandas
+      - python3-scapy
     state: present
     update_cache: true
   become: true
@@ -19,4 +20,10 @@
   copy:
     src: ./../../client.py
     dest: /var/log/dns/client.py
+    mode: '0644'
+
+- name: Copy Metadata Extractor Script to /var/log/dns
+  copy:
+    src: ./../../metadata_extractor.py
+    dest: /var/log/dns/metadata_extractor.py
     mode: '0644'

@@ -23,10 +23,11 @@
       when: resolved_conf.stat.exists
 
 
-    - name: Install git
+    - name: Install git & kdig
       apt:
         name:
           - git
+          - knot-dnsutils
         state: present
         update_cache: yes
 
@@ -39,13 +40,13 @@
 
   roles:
     - resolved
-    - stubby-install
+    #- stubby-install
     - tcpdump
     - python
     - tranco
     - dnsproxy
     # Role to start stubby as a service, resolving via dnsproxy
-    - stubby-service
+   # - stubby-service
 
   # Enable and start all services after setting configs with roles
   post_tasks:
@@ -55,9 +56,9 @@
         enabled: yes
         state: started
       loop:
-        - dnsproxy
-        - stubby
         - systemd-resolved
+        - dnsproxy
+        #- stubby
 
     - name: Enable & start dns-monitor
       systemd:

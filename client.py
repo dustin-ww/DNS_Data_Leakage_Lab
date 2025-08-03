@@ -6,67 +6,140 @@ import time
 import pandas as pd
 import subprocess
 import os
+import signal
+import sys
 
-def process_csv(csv_file, limit=100):
-    try:
-        df = pd.read_csv(csv_file, header=None, usecols=[1], nrows=limit)
-        return df[1].tolist()
-    except Exception as e:
-        print(f"CSV error: {e}")
-        return []
-
-def resolve_dot(domain, server='127.0.0.1', port=53):
-    """DNS over TLS query"""
-    try:
-        query = dns.message.make_query(domain, dns.rdatatype.A)
-        response = dns.query.tls(query, server, port=port, timeout=5)
-        ips = []
-        if response.answer:
-            for ans in response.answer:
-                for item in ans.items:
-                    ips.append(item.to_text())
-        return ips
-    except Exception as e:
-        print(f"DoT error for {domain}: {e}")
-        return []
+class DNSMonitor:
+    def __init__(self):
+        self.tcpdump_processes = []
+        signal.signal(signal.SIGINT, self.cleanup)
     
-def run_tcpdump(interface='eth0', output_file='/opt/captures/dot.pcap'):
-    """Run tcpdump to capture DNS over TLS traffic"""
+    def cleanup(self):
+        """Clean up tcpdump processes on exit"""
+        print("\nCleaning up...")
+        for proc in self.tcpdump_processes:
+            if proc and proc.poll() is None:
+                proc.terminate()
+                proc.wait()
+        sys.exit(0)
+    
+    def process_csv(csv_file):
+        try:
+            df = pd.read_csv(csv_file, header=None, usecols=[1])
+            return df[1].tolist()
+        except Exception as e:
+            print(f"CSV error: {e}")
+            return []
+
+    
+    def resolve_dot(self, domain, server='127.0.0.1', port=853):
+        """DNS over TLS query via local proxy without cert verification"""
+        try:
+            query = dns.message.make_query(domain, dns.rdatatype.A)
+            
+            # Connect to local DNS proxy without certificate verification
+            import ssl
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            
+            response = dns.query.tls(query, server, port=port, timeout=10, ssl_context=context)
+            
+            ips = []
+            if response.answer:
+                for ans in response.answer:
+                    for item in ans.items:
+                        ips.append(str(item))
+            
+            return ips
+            
+        except Exception as e:
+            print(f"DoT error for {domain}: {e}")
+            return []
+    
+    def run_tcpdump(self, interface='eth0', output_file='/tmp/dot.pcap'):
+        """Start tcpdump with better error handling"""
+        try:
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            
+            cmd = [
+                'tcpdump', '-i', interface, '-w', output_file,
+                '-s', '0', 'port', '853'
+            ]
+            
+            with open(os.devnull, 'w') as devnull:
+                process = subprocess.Popen(cmd, stdout=devnull, stderr=devnull)
+            
+            self.tcpdump_processes.append(process)
+            print(f"Started capture: {output_file}")
+            return process
+            
+        except Exception as e:
+            print(f"TCPDump error: {e}")
+            return None
+    
+    def monitor_domains(self, csv_files, capture_time=10):
+        """Main monitoring function"""
+        for csv_file in csv_files:
+            if not os.path.exists(csv_file):
+                print(f"File not found: {csv_file}")
+                continue
+                
+            print(f"\nProcessing {csv_file}")
+            domains = self.process_csv(csv_file)
+            
+            if not domains:
+                print(f"No domains found in {csv_file}")
+                continue
+            
+            # Create output directory
+            filename = os.path.splitext(os.path.basename(csv_file))[0]
+            output_dir = f"./captures/{filename}"
+            os.makedirs(output_dir, exist_ok=True)
+            
+            for i, domain in enumerate(domains, 1):
+                print(f"[{i}/{len(domains)}] Processing {domain}")
+                
+                # Start packet capture
+                pcap_file = f"{output_dir}/dot_{domain.replace('.', '_')}.pcap"
+                dump_proc = self.run_tcpdump(output_file=pcap_file)
+                
+                if dump_proc:
+                    time.sleep(1)  # Let tcpdump start
+                    
+                    # Perform DNS query
+                    ips = self.resolve_dot(domain)
+                    print(f"  {domain} -> {ips if ips else 'No response'}")
+                    
+                    # Wait for capture
+                    time.sleep(capture_time)
+                    
+                    # Stop capture
+                    dump_proc.terminate()
+                    dump_proc.wait()
+                    self.tcpdump_processes.remove(dump_proc)
+                    print(f"  Capture saved: {pcap_file}")
+                else:
+                    print(f"  Failed to start capture for {domain}")
+
+def main():
+    # Configuration
+    csv_files = [
+        "./data/categories/banking.csv",
+        "./data/categories/streaming.csv", 
+        "./data/categories/news.csv"
+    ]
+    
+    monitor = DNSMonitor()
+    
     try:
-        cmd = ['tcpdump', '-i', interface, '-w', output_file, '-s', '0', '-U', 'port', '853']
-        process = subprocess.Popen(cmd)
-        print(f"TCPDump started on {interface}, capturing to {output_file}")
-        return process
-    except Exception as e:
-        print(f"TCPDump error: {e}")
+        monitor.monitor_domains(
+            csv_files=csv_files,
+            capture_time=30  # 30 seconds capture time
+        )
+    except KeyboardInterrupt:
+        monitor.cleanup()
 
 if __name__ == "__main__":
-    # Path to the recent tranco top list
-    output_dir_base = "./"
-
-    banking_domains_csv = "./data/categories/banking.csv"
-    streaming_domains_csv = "./data/categories/streaming.csv"
-    news_domains_csv = "./data/categories/news.csv"
-    files = [banking_domains_csv, streaming_domains_csv, news_domains_csv]
-
-    for file in files:
-        print(f"Processing {file}")
-        domains = process_csv(file, 100)
-
-        filename = os.path.basename(file)
-        output_direcotry = output_dir_base + filename
-        print(f"Creating output directory for {filename} ({output_direcotry})")
-        os.makedirs(output_direcotry, exist_ok=True)
-
-        for i, domain in enumerate(domains, 1):
-            print(f"[{i}/{len(domains)}] Resolving {domain} via DoT")
-            dump_proc = run_tcpdump(output_file=f"{output_direcotry}/dot_{domain}.pcap")
-            
-            ips = resolve_dot(domain)
-            print(f"{domain} -> {ips}")
-            time.sleep(30)
-            print(f"Stopping tcpdump for {domain}, output saved to {output_direcotry}/dot_{domain}.pcap")
-            dump_proc.terminate()
-            dump_proc.wait()
-            time.sleep(5)
-
+    main()
