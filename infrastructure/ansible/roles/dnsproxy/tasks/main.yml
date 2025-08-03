@@ -145,7 +145,7 @@
         --tls-port=853 \
         --tls-crt=/usr/local/etc/dnsproxy/tls/dnsproxy.crt \
         --tls-key=/usr/local/etc/dnsproxy/tls/dnsproxy.key \
-        -u tls://dns11.quad9.net \
+        -u tls://9.9.9.11 \
         -o /var/log/dnsproxy/dnsproxy.log \
         -v \
         -p 0

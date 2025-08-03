@@ -23,33 +23,29 @@
       when: resolved_conf.stat.exists
 
 
-    - name: Update APT Cache and Packages
-      ansible.builtin.apt:
-        update_cache: true
-        cache_valid_time: 3600 
-
-    - name: Install Basic Dependencies and Runtime Packages
+    - name: Install git
       apt:
         name:
-          - systemd-resolved
-          - dnsutils 
           - git
         state: present
         update_cache: yes
-    
-    # Temp Directory for Measurements
-    - name: Create DNS logging directory
+
+    - name: Ensure /var/log/dns directory exists
       file:
-        path: "/var/log/dns"
+        path: /var/log/dns
         state: directory
         mode: '0755'
 
+
   roles:
-    - stubby
+    - resolved
+    - stubby-install
     - tcpdump
     - python
     - tranco
     - dnsproxy
+    # Role to start stubby as a service, resolving via dnsproxy
+    - stubby-service
 
   # Enable and start all services after setting configs with roles
   post_tasks:

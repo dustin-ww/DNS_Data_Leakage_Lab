@@ -5,8 +5,9 @@ import dns.rdatatype
 import time
 import pandas as pd
 import subprocess
+import os
 
-def process_tranco_csv(csv_file, limit=100):
+def process_csv(csv_file, limit=100):
     try:
         df = pd.read_csv(csv_file, header=None, usecols=[1], nrows=limit)
         return df[1].tolist()
@@ -14,7 +15,7 @@ def process_tranco_csv(csv_file, limit=100):
         print(f"CSV error: {e}")
         return []
 
-def resolve_dot(domain, server='9.9.9.9', port=853):
+def resolve_dot(domain, server='127.0.0.1', port=53):
     """DNS over TLS query"""
     try:
         query = dns.message.make_query(domain, dns.rdatatype.A)
@@ -41,16 +42,31 @@ def run_tcpdump(interface='eth0', output_file='/opt/captures/dot.pcap'):
 
 if __name__ == "__main__":
     # Path to the recent tranco top list
-    tranco_file = "./data/tranco/tranco_top_1m.csv"
-    domains = process_tranco_csv(tranco_file, 100)
+    output_dir_base = "./"
 
-    for i, domain in enumerate(domains, 1):
-        print(f"[{i}/{len(domains)}] Resolving {domain} via DoT")
-        dump_proc = run_tcpdump(output_file=f"./test/dot_{domain}.pcap")
-        
-        ips = resolve_dot(domain)
-        print(f"{domain} -> {ips}")
-        time.sleep(30)
-        print(f"Stopping tcpdump for {domain}, output saved to /opt/captures/dot_{domain}.pcap")
-        dump_proc.terminate()
-        dump_proc.wait()
+    banking_domains_csv = "./data/categories/banking.csv"
+    streaming_domains_csv = "./data/categories/streaming.csv"
+    news_domains_csv = "./data/categories/news.csv"
+    files = [banking_domains_csv, streaming_domains_csv, news_domains_csv]
+
+    for file in files:
+        print(f"Processing {file}")
+        domains = process_csv(file, 100)
+
+        filename = os.path.basename(file)
+        output_direcotry = output_dir_base + filename
+        print(f"Creating output directory for {filename} ({output_direcotry})")
+        os.makedirs(output_direcotry, exist_ok=True)
+
+        for i, domain in enumerate(domains, 1):
+            print(f"[{i}/{len(domains)}] Resolving {domain} via DoT")
+            dump_proc = run_tcpdump(output_file=f"{output_direcotry}/dot_{domain}.pcap")
+            
+            ips = resolve_dot(domain)
+            print(f"{domain} -> {ips}")
+            time.sleep(30)
+            print(f"Stopping tcpdump for {domain}, output saved to {output_direcotry}/dot_{domain}.pcap")
+            dump_proc.terminate()
+            dump_proc.wait()
+            time.sleep(5)
+

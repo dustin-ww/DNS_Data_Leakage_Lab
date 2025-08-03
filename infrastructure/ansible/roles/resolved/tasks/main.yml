@@ -1,0 +1,30 @@
+- name: Install systemd-resolved for debian
+  apt:
+    name:
+      - systemd-resolved
+    state: present
+    update_cache: yes
+
+- name: Check if resolved.conf exists
+  stat:
+    path: /etc/systemd/resolved.conf
+  register: resolved_conf
+
+- name: Set Temporary DNS Server for Internet Access
+  lineinfile:
+    path: /etc/systemd/resolved.conf
+    line: "DNS=9.9.9.9"
+    state: present
+  when: resolved_conf.stat.exists
+
+- name: Restart systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: restarted
+  when: resolved_conf.stat.exists
+
+
+- name: Update APT Cache and Packages
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600 

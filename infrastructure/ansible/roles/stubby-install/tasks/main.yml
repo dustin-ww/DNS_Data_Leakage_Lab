@@ -1,0 +1,56 @@
+- name: Install stubby build dependencies and runtime packages
+  apt:
+    name:
+      - build-essential
+      - cmake
+      - libgetdns-dev
+      - libyaml-dev
+      - libssl-dev
+      - libsystemd-dev
+      - pkg-config
+    state: present
+    update_cache: yes
+
+- name: Clone and build Stubby from source
+  block:
+    - name: Clone Stubby repository
+      git:
+        repo: https://github.com/getdnsapi/stubby.git
+        dest: /tmp/stubby
+        force: yes
+
+    - name: Create build directory
+      file:
+        path: /tmp/stubby/build
+        state: directory
+
+    - name: Configure Stubby build
+      command: cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+      args:
+        chdir: /tmp/stubby/build
+        creates: /tmp/stubby/build/Makefile
+
+    - name: Build Stubby
+      command: make -j{{ ansible_processor_vcpus | default(2) }}
+      args:
+        chdir: /tmp/stubby/build
+
+    - name: Install Stubby
+      command: make install
+      args:
+        chdir: /tmp/stubby/build
+        creates: /usr/local/bin/stubby
+
+    - name: Ensure Stubby config directory exists
+      file:
+        path: "/usr/local/etc/stubby"
+        state: directory
+
+    - name: Create stubby user
+      user:
+        name: stubby
+        system: yes
+        shell: /usr/sbin/nologin
+        home: /var/lib/stubby
+        create_home: no
+
