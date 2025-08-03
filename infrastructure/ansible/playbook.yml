@@ -4,6 +4,25 @@
     ansible_shell_executable: /bin/bash
 
   pre_tasks:
+    - name: Check if resolved.conf exists
+      stat:
+        path: /etc/systemd/resolved.conf
+      register: resolved_conf
+
+    - name: Set Temporary DNS Server for Internet Access
+      lineinfile:
+        path: /etc/systemd/resolved.conf
+        line: "DNS=9.9.9.9"
+        state: present
+      when: resolved_conf.stat.exists
+
+    - name: Restart systemd-resolved
+      systemd:
+        name: systemd-resolved
+        state: restarted
+      when: resolved_conf.stat.exists
+
+
     - name: Update APT Cache and Packages
       ansible.builtin.apt:
         update_cache: true
@@ -17,17 +36,6 @@
           - git
         state: present
         update_cache: yes
-
-    - name: Set Temporary DNS Server for Internet Access
-      lineinfile:
-        path: /etc/systemd/resolved.conf
-        line: "DNS=9.9.9.9"
-        state: present
-    
-    - name: Restart systemd-resolved
-      systemd:
-        name: systemd-resolved
-        state: restarted
     
     # Temp Directory for Measurements
     - name: Create DNS logging directory
@@ -37,7 +45,6 @@
         mode: '0755'
 
   roles:
-    - timesync
     - stubby
     - tcpdump
     - python
