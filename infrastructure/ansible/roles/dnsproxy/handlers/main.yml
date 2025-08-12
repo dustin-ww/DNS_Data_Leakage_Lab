@@ -8,3 +8,8 @@
   service:
     name: dnsproxy
     state: restarted
+
+- name: Restart systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: restarted
