@@ -43,8 +43,9 @@
     #- stubby-install
     - tcpdump
     - python
-    - tranco
-    - dnsproxy
+    - sslsplit
+    #- tranco
+    #- dnsproxy
     # Role to start stubby as a service, resolving via dnsproxy
    # - stubby-service
 
@@ -57,7 +58,7 @@
         state: started
       loop:
         - systemd-resolved
-        - dnsproxy
+        - sslsplit
         #- stubby
 
     - name: Enable & start dns-monitor

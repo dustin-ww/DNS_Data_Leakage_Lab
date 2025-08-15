@@ -14,7 +14,7 @@
       # Stubby verbindet sich mit Unbound DoT Proxy
       upstream_recursive_servers:
         - address_data: 127.0.0.1
-          tls_port: 853
+          tls_port: 8853
           tls_auth_name: "dnsproxy.local"
       appdata_dir: "/var/log/dns"
       log_level: 7
@@ -84,9 +84,9 @@
         mode: '0644'
         content: |
           [Resolve]
-          DNS=127.0.0.1:853
+          DNS=127.0.0.1:53
           DNSStubListener=no
-          Cache=yes
+          Cache=no
           DNSOverTLS=no
       notify: Restart systemd-resolved
 
