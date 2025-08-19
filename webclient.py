@@ -62,7 +62,7 @@ class DNSMonitor:
             print(f"CSV error: {e}")
             return []
     
-    def visit_website(self, domain):
+    def visit_website(self, domain, capture_time=30):
         """Visit website using Selenium, fully isolated per run"""
         driver = self.setup_selenium()
         if not driver:
@@ -74,7 +74,8 @@ class DNSMonitor:
             driver.get(url)
             
             # Wait a bit for page to load
-            time.sleep(30)
+            print("Starting to wait 30 seconds for page to load...")
+            time.sleep(capture_time)
             
             print(f"  Successfully loaded {domain}")
             return True
@@ -111,7 +112,7 @@ class DNSMonitor:
             print(f"TCPDump error: {e}")
             return None
     
-    def monitor_domains(self, csv_files, capture_time=10, rounds=1):
+    def monitor_domains(self, csv_files, capture_time=30, rounds=1):
         """Main monitoring function with round robin support"""
         # Pre-load all domains from CSV files
         file_domains = {}
@@ -147,18 +148,17 @@ class DNSMonitor:
                     dump_proc = self.run_tcpdump(output_file=pcap_file)
                     
                     if dump_proc:
-                        time.sleep(1)  # Let tcpdump start
+                        time.sleep(2)  # Let tcpdump start
                         
                         # Visit website (will auto-clean after visit)
                         self.visit_website(domain)
-                        
-                        # Wait for capture
-                        time.sleep(capture_time)
-                        
+
                         dump_proc.terminate()
                         dump_proc.wait()
                         self.tcpdump_processes.remove(dump_proc)
                         print(f"  Capture saved: {pcap_file}")
+                        print("Starting 30 Seconds Timeout to act fair during measurement...")
+                        time.sleep(30)
                     else:
                         print(f"  Failed to start capture for {domain}")
 
