@@ -57,6 +57,20 @@
     - /var/log/sslsplit/connections.log
     - /var/log/sslsplit/keys.log
 
+- name: Add vagrant user to sslsplit group
+  user:
+    name: vagrant
+    groups: sslsplit
+    append: yes
+  
+- name: Create empty pcap file for sslsplit
+  file:
+    path: /var/log/sslsplit/traffic.pcap
+    state: touch
+    owner: sslsplit
+    group: sslsplit
+    mode: '0640'
+
 - name: Create minimal sslsplit systemd service
   copy:
     dest: /etc/systemd/system/sslsplit.service
@@ -71,6 +85,7 @@
         -k /etc/sslsplit/ca.key \
         -c /etc/sslsplit/ca.crt \
         -l /var/log/sslsplit/connections.log \
+        -X /var/log/sslsplit/traffic.pcap \
         -L /var/log/sslsplit/keys.log \
         -D \
         ssl 127.0.0.1 8853 9.9.9.9 853

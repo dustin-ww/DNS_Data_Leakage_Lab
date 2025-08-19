@@ -19,32 +19,32 @@
       exec /usr/bin/tcpdump -i eth0 -w "$LOGDIR/dns_traffic.pcap" -s 0 -U port 853
 
 
-- name: Create dns-monitor service (only this custom unit is needed)
-  copy:
-    dest: /etc/systemd/system/dns-monitor.service
-    mode: '0644'
-    content: |
-      [Unit]
-      Description=DNS Traffic Monitor
-      Wants=stubby.service systemd-resolved.service network-online.target
-      After=stubby.service systemd-resolved.service network-online.target
-      PartOf=stubby.service
+# - name: Create dns-monitor service (only this custom unit is needed)
+#   copy:
+#     dest: /etc/systemd/system/dns-monitor.service
+#     mode: '0644'
+#     content: |
+#       [Unit]
+#       Description=DNS Traffic Monitor
+#       Wants=stubby.service systemd-resolved.service network-online.target
+#       After=stubby.service systemd-resolved.service network-online.target
+#       PartOf=stubby.service
 
-      [Service]
-      Type=simple
-      ExecStart=/usr/local/bin/dns-capture
-      KillSignal=SIGINT
-      Restart=on-failure
-      RestartSec=5
-      # Optional: unter eigenem Benutzer mit CAP_NET_RAW (wenn tcpdump setcap hat)
-      # User=_tcpdump
-      # AmbientCapabilities=CAP_NET_RAW
-      # CapabilityBoundingSet=CAP_NET_RAW
+#       [Service]
+#       Type=simple
+#       ExecStart=/usr/local/bin/dns-capture
+#       KillSignal=SIGINT
+#       Restart=on-failure
+#       RestartSec=5
+#       # Optional: unter eigenem Benutzer mit CAP_NET_RAW (wenn tcpdump setcap hat)
+#       # User=_tcpdump
+#       # AmbientCapabilities=CAP_NET_RAW
+#       # CapabilityBoundingSet=CAP_NET_RAW
 
-      [Install]
-      WantedBy=multi-user.target
+#       [Install]
+#       WantedBy=multi-user.target
 
-  notify: Reload systemd
+#   notify: Reload systemd
 
 - name: Set capabilities for tcpdump on debian
   ansible.builtin.command: setcap cap_net_raw,cap_net_admin=eip /usr/bin/tcpdump

@@ -19,24 +19,29 @@ class DNSMonitor:
         self.tcpdump_processes = []
         self.driver = None
         signal.signal(signal.SIGINT, self.cleanup)
-        self.setup_selenium()
     
     def setup_selenium(self):
         """Setup Selenium WebDriver"""
         try:
             chrome_options = Options()
             chrome_options.add_argument("--headless")  # Headless mode
-            chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--disable-gpu")            
+            chrome_options.add_argument("--no-sandbox")  
             chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            
-            self.driver = webdriver.Chrome(options=chrome_options)
-            self.driver.set_page_load_timeout(30)
+
+            chrome_options.add_argument("--dns-server=127.0.0.1")
+            chrome_options.add_argument("--disable-features=AsyncDns")
+            chrome_options.add_argument("--dns-prefetch-disable")
+            chrome_options.add_argument("--disable-features=SecureDns")
+
+            driver = webdriver.Chrome(options=chrome_options)
+            driver.set_page_load_timeout(30)
             print("Selenium WebDriver initialized")
+            return driver
         except Exception as e:
             print(f"Selenium setup error: {e}")
-            self.driver = None
+            return None
     
     def cleanup(self, signum=None, frame=None):
         """Clean up tcpdump processes and selenium on exit"""
@@ -58,34 +63,36 @@ class DNSMonitor:
             return []
     
     def visit_website(self, domain):
-        """Visit website using Selenium"""
-        if not self.driver:
+        """Visit website using Selenium, fully isolated per run"""
+        driver = self.setup_selenium()
+        if not driver:
             return False
             
         try:
             url = f"https://{domain}"
             print(f"  Visiting {url}")
-            self.driver.get(url)
+            driver.get(url)
             
             # Wait a bit for page to load
             time.sleep(30)
             
-            # Try to wait for body element to ensure page loaded
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            
             print(f"  Successfully loaded {domain}")
             return True
-            
         except Exception as e:
             print(f"  Website visit error for {domain}: {e}")
             return False
+        finally:
+            try:
+                # Clean up browser session
+                driver.delete_all_cookies()
+                driver.quit()
+                print("  Browser cleaned up")
+            except Exception:
+                pass
     
     def run_tcpdump(self, interface='eth0', output_file='/tmp/dot.pcap'):
         """Start tcpdump with better error handling"""
         try:
-            # Ensure output directory exists
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
             
             cmd = [
@@ -104,53 +111,60 @@ class DNSMonitor:
             print(f"TCPDump error: {e}")
             return None
     
-    def monitor_domains(self, csv_files, capture_time=10):
-        """Main monitoring function"""
+    def monitor_domains(self, csv_files, capture_time=10, rounds=1):
+        """Main monitoring function with round robin support"""
+        # Pre-load all domains from CSV files
+        file_domains = {}
         for csv_file in csv_files:
             if not os.path.exists(csv_file):
                 print(f"File not found: {csv_file}")
                 continue
-                
-            print(f"\nProcessing {csv_file}")
             domains = self.process_csv(csv_file)
+            if domains:
+                filename = os.path.splitext(os.path.basename(csv_file))[0]
+                file_domains[filename] = domains
+        
+        if not file_domains:
+            print("No valid CSV files found")
+            return
+        
+        # Round robin execution
+        for round_num in range(1, rounds + 1):
+            print(f"\n{'='*50}")
+            print(f"Starting Round {round_num}/{rounds}")
+            print(f"{'='*50}")
             
-            if not domains:
-                print(f"No domains found in {csv_file}")
-                continue
-            
-            # Create output directory
-            filename = os.path.splitext(os.path.basename(csv_file))[0]
-            output_dir = f"./captures/{filename}"
-            os.makedirs(output_dir, exist_ok=True)
-            
-            for i, domain in enumerate(domains, 1):
-                print(f"[{i}/{len(domains)}] Processing {domain}")
+            for filename, domains in file_domains.items():
+                print(f"\nProcessing {filename} (Round {round_num})")
                 
-                # Start packet capture
-                pcap_file = f"{output_dir}/dot_{domain.replace('.', '_')}.pcap"
-                dump_proc = self.run_tcpdump(output_file=pcap_file)
+                output_dir = f"./captures/{filename}/{round_num}"
+                os.makedirs(output_dir, exist_ok=True)
                 
-                if dump_proc:
-                    time.sleep(1)  # Let tcpdump start
+                for i, domain in enumerate(domains, 1):
+                    print(f"[{i}/{len(domains)}] Processing {domain}")
                     
-                    # Visit website with Selenium
-                    self.visit_website(domain)
+                    pcap_file = f"{output_dir}/dot_{domain.replace('.', '_')}.pcap"
+                    dump_proc = self.run_tcpdump(output_file=pcap_file)
                     
-                    # Wait for capture
-                    #time.sleep(capture_time)
-                    
-                    # Stop capture
-                    dump_proc.terminate()
-                    dump_proc.wait()
-                    self.tcpdump_processes.remove(dump_proc)
-                    print(f"  Capture saved: {pcap_file}")
-                else:
-                    print(f"  Failed to start capture for {domain}")
+                    if dump_proc:
+                        time.sleep(1)  # Let tcpdump start
+                        
+                        # Visit website (will auto-clean after visit)
+                        self.visit_website(domain)
+                        
+                        # Wait for capture
+                        time.sleep(capture_time)
+                        
+                        dump_proc.terminate()
+                        dump_proc.wait()
+                        self.tcpdump_processes.remove(dump_proc)
+                        print(f"  Capture saved: {pcap_file}")
+                    else:
+                        print(f"  Failed to start capture for {domain}")
 
 def main():
-    # Configuration
     csv_files = [
-        "./data/categories/news.csv"
+        "./data/categories/news.csv",
         "./data/categories/banking.csv",
         "./data/categories/streaming.csv", 
     ]
@@ -160,7 +174,8 @@ def main():
     try:
         monitor.monitor_domains(
             csv_files=csv_files,
-            capture_time=30  # 30 seconds capture time
+            capture_time=30,
+            rounds=3
         )
     except KeyboardInterrupt:
         monitor.cleanup()

@@ -40,10 +40,12 @@
 
   roles:
     - resolved
-    #- stubby-install
+    - stubby-install
     - tcpdump
     - python
     - sslsplit
+    - stubby-service
+    - domains
     #- tranco
     #- dnsproxy
     # Role to start stubby as a service, resolving via dnsproxy
@@ -61,8 +63,8 @@
         - sslsplit
         #- stubby
 
-    - name: Enable & start dns-monitor
-      systemd:
-        name: dns-monitor
-        enabled: yes
-        state: started
+    # - name: Enable & start dns-monitor
+    #   systemd:
+    #     name: dns-monitor
+    #     enabled: yes
+    #     state: started

@@ -127,9 +127,9 @@ class DNSMonitor:
 def main():
     # Configuration
     csv_files = [
+        "./data/categories/news.csv"
         "./data/categories/banking.csv",
         "./data/categories/streaming.csv", 
-        "./data/categories/news.csv"
     ]
     
     monitor = DNSMonitor()

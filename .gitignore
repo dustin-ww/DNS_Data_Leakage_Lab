@@ -71,3 +71,10 @@ vagrant-ssh-config
 tranco*
 *.csv
 *.pcap
+
+venv
+
+test
+
+*.png
+*.joblib
