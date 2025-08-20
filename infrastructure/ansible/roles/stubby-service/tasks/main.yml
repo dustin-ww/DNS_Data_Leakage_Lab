@@ -16,7 +16,7 @@
         - address_data: 127.0.0.1
           tls_port: 8853
           tls_auth_name: "dnsproxy.local"
-      appdata_dir: "/var/log/dns"
+      appdata_dir: "/var/log/dns/stubby"
       log_level: 7
   notify: Restart stubby
 
@@ -51,8 +51,8 @@
       [Service]
       Type=simple
       ExecStart=/usr/local/bin/stubby -C /usr/local/etc/stubby/stubby.yml -l
-      StandardOutput=append:/var/log/dns/stubby.log
-      StandardError=append:/var/log/dns/stubby.log
+      StandardOutput=append:/var/log/dns/stubby/stubby.log
+      StandardError=append:/var/log/dns/stubby/stubby.log
 
 
       KillSignal=SIGINT
@@ -71,7 +71,7 @@
       ProtectKernelTunables=true
       ProtectSystem=strict
       ProtectHome=true
-      ReadWritePaths=/var/log/dns
+      ReadWritePaths=/var/log/dns/stubby
       PrivateDevices=true
       PrivateTmp=true
 

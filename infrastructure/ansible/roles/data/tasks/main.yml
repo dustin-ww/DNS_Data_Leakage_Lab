@@ -1,6 +1,6 @@
 - name: Ensure categories directory exists
   file:
-    path: /var/log/dns/data/categories
+    path: /opt/dns/data/categories
     state: directory
     owner: stubby
     group: stubby
@@ -10,11 +10,11 @@
 - name: Upload category CSV files
   copy:
     src: "{{ item }}"
-    dest: "/var/log/dns/data/categories/"
+    dest: "/opt/dns/data/categories/"
     owner: stubby
     group: stubby
     mode: '0644'
   loop:
-    - ./data/news.csv
-    - ./data/banking.csv
-    - ./data/streaming.csv
+    - "{{ data_source_directory }}/news.csv"
+    - "{{ data_source_directory }}/banking.csv"
+    - "{{ data_source_directory }}/streaming.csv"

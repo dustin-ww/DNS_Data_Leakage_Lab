@@ -11,7 +11,7 @@
     mode: '0755'
   loop:
     - /etc/sslsplit
-    - /var/log/sslsplit
+    - /var/log/dns/sslsplit
 
 - name: Generate CA key
   command: openssl genrsa -out /etc/sslsplit/ca.key 4096
@@ -44,7 +44,7 @@
     - { path: '/etc/sslsplit', mode: '0750' }
     - { path: '/etc/sslsplit/ca.crt', mode: '0640' }
     - { path: '/etc/sslsplit/ca.key', mode: '0640' }
-    - { path: '/var/log/sslsplit', mode: '0750' }
+    - { path: '/var/log/dns/sslsplit', mode: '0750' }
 
 - name: Create empty log files for sslsplit
   file:
@@ -54,8 +54,8 @@
     group: sslsplit
     mode: '0640'
   loop:
-    - /var/log/sslsplit/connections.log
-    - /var/log/sslsplit/keys.log
+    - /var/log/dns/sslsplit/connections.log
+    - /var/log/dns/sslsplit/keys.log
 
 - name: Add vagrant user to sslsplit group
   user:
@@ -65,7 +65,7 @@
   
 - name: Create empty pcap file for sslsplit
   file:
-    path: /var/log/sslsplit/traffic.pcap
+    path: /var/log/dns/sslsplit/traffic.pcap
     state: touch
     owner: sslsplit
     group: sslsplit
@@ -84,9 +84,9 @@
       ExecStart=/usr/bin/sslsplit \
         -k /etc/sslsplit/ca.key \
         -c /etc/sslsplit/ca.crt \
-        -l /var/log/sslsplit/connections.log \
-        -X /var/log/sslsplit/traffic.pcap \
-        -L /var/log/sslsplit/keys.log \
+        -l /var/log/dns/sslsplit/connections.log \
+        -X /var/log/dns/sslsplit/traffic.pcap \
+        -L /var/log/dns/sslsplit/keys.log \
         -D \
         ssl 127.0.0.1 8853 9.9.9.9 853
       User=sslsplit
@@ -94,7 +94,7 @@
       AmbientCapabilities=CAP_NET_BIND_SERVICE
       CapabilityBoundingSet=CAP_NET_BIND_SERVICE
       NoNewPrivileges=true
-      ReadWritePaths=/var/log/sslsplit
+      ReadWritePaths=/var/log/dns/sslsplit
       PrivateDevices=true
       PrivateTmp=true
       Restart=on-failure

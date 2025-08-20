@@ -13,44 +13,44 @@
   become: true
 
 - name: Create Python virtual environment
-  command: python3 -m venv /var/log/dns/venv
+  command: python3 -m venv /opt/dns/venv
   args:
-    creates: /var/log/dns/venv/bin/activate
+    creates: /opt/dns/venv/bin/activate
 
 - name: Install pip in venv (ensure latest pip)
-  command: /var/log/dns/venv/bin/pip install --upgrade pip setuptools wheel
+  command: /opt/dns/venv/bin/pip install --upgrade pip setuptools wheel
 
 - name: Install required Python packages in venv
-  command: /var/log/dns/venv/bin/pip install dnspython pandas scapy selenium
+  command: /opt/dns/venv/bin/pip install dnspython pandas scapy selenium
 
 - name: Ensure venv activation in .bashrc for vagrant user
   lineinfile:
     path: /home/vagrant/.bashrc
     insertafter: EOF
-    line: 'source /var/log/dns/venv/bin/activate'
+    line: 'source /opt/dns/venv/bin/activate'
     state: present
     create: yes
     owner: vagrant
     group: vagrant
     mode: '0644'
 
-- name: Copy DNS Client Script to /var/log/dns
+- name: Copy DNS Client Script to /opt/dns
   copy:
-    src: ./../../client.py
-    dest: /var/log/dns/client.py
+    src: "{{ python_source_dir}}/client.py"
+    dest: /opt/dns/client.py
     mode: '0644'
 
-- name: Copy Web DNS Client Script to /var/log/dns
+- name: Copy Web DNS Client Script to /opt/dns
   copy:
-    src: ./../../webclient.py
-    dest: /var/log/dns/webclient.py
+    src: "{{ python_source_dir}}/webclient.py"
+    dest: /opt/dns/webclient.py
     mode: '0644'
 
 
-- name: Copy Metadata Extractor Script to /var/log/dns
+- name: Copy Metadata Extractor Script to /opt/dns
   copy:
-    src: ./../../metadata_extractor.py
-    dest: /var/log/dns/metadata_extractor.py
+    src: "{{ python_source_dir}}/metadata_extractor.py"
+    dest: /opt/dns/metadata_extractor.py
     mode: '0644'
 
 - name: Install Chromium browser and chromedriver

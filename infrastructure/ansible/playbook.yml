@@ -45,11 +45,7 @@
     - python
     - sslsplit
     - stubby-service
-    - domains
-    #- tranco
-    #- dnsproxy
-    # Role to start stubby as a service, resolving via dnsproxy
-   # - stubby-service
+    - data
 
   # Enable and start all services after setting configs with roles
   post_tasks:
@@ -61,7 +57,7 @@
       loop:
         - systemd-resolved
         - sslsplit
-        #- stubby
+        - stubby
 
     # - name: Enable & start dns-monitor
     #   systemd:
