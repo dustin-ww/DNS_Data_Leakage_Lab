@@ -57,9 +57,9 @@
     - /var/log/dns/sslsplit/connections.log
     - /var/log/dns/sslsplit/keys.log
 
-- name: Add vagrant user to sslsplit group
+- name: Add measurement user to sslsplit group
   user:
-    name: vagrant
+    name: "{{ measure_user }}"
     groups: sslsplit
     append: yes
   

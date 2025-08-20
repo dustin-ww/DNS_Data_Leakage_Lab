@@ -26,4 +26,4 @@ start:
 
 
 deploy-dg:
-    ansible-playbook -i ./ansible/dg_iinventory.yml ./ansible/playbook.yml
+    ansible-playbook -i ./ansible/dg_inventory.yml ./ansible/playbook.yml

@@ -1,0 +1,1 @@
+sudo sed -i '/dns-nameservers.*67\.207\.67/d' /etc/network/interfaces

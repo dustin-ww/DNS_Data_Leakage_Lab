@@ -15,6 +15,7 @@
     group: stubby
     mode: '0644'
   loop:
-    - "{{ data_source_directory }}/news.csv"
-    - "{{ data_source_directory }}/banking.csv"
-    - "{{ data_source_directory }}/streaming.csv"
+    - "{{ data_source_dir }}/news.csv"
+    - "{{ data_source_dir }}/casino.csv"
+    - "{{ data_source_dir }}/streaming.csv"
+    - "{{ data_source_dir }}/top.csv"

@@ -1,4 +1,4 @@
-- hosts: client
+- hosts: clients
   become: yes
   vars:
     ansible_shell_executable: /bin/bash
@@ -22,6 +22,17 @@
         state: restarted
       when: resolved_conf.stat.exists
 
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Upgrade all packages
+      ansible.builtin.apt:
+        upgrade: dist
+
+    - name: Remove unused packages
+      ansible.builtin.apt:
+        autoremove: yes
 
     - name: Install git & kdig
       apt:

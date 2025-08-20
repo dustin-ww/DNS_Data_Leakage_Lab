@@ -35,6 +35,14 @@
     regexp: '^nameserver (?!127\.0\.0\.1).*'
     replace: ''
   notify: Reload systemd
+
+- name: Create stubby log directory
+  file:
+    path: /var/log/dns/stubby
+    state: directory
+    owner: stubby
+    group: stubby
+    mode: '0755'
   
 - name: Create stubby systemd service
   copy:

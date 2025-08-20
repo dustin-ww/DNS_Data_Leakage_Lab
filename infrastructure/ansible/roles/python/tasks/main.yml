@@ -23,15 +23,15 @@
 - name: Install required Python packages in venv
   command: /opt/dns/venv/bin/pip install dnspython pandas scapy selenium
 
-- name: Ensure venv activation in .bashrc for vagrant user
+- name: Ensure venv activation in .bashrc for measurement user
   lineinfile:
-    path: /home/vagrant/.bashrc
+    path: ~/.bashrc
     insertafter: EOF
     line: 'source /opt/dns/venv/bin/activate'
     state: present
     create: yes
-    owner: vagrant
-    group: vagrant
+    owner: "{{ measure_user }}"
+#    group: vagrant
     mode: '0644'
 
 - name: Copy DNS Client Script to /opt/dns
@@ -81,15 +81,16 @@
       WorkingDirectory=/opt/dns
       StandardOutput=append:/var/log/dns/dns-webclient-measure.log
 
-      User=root
+      User={{ measure_user }}
       Type=oneshot
       RemainAfterExit=no
 
       [Install]
       WantedBy=multi-user.target
-  mode: "0644"
+    mode: "0644"
 
-- name: Enable dns-measure service
-  systemd:
-    name: dns-measure
-    enabled: true
+# - name: Enable dns-measure service
+#   systemd:
+#     name: dns-webclient-measure
+#     enabled: true
+#     state: stopped # Stopped initially to avoid running on boot
