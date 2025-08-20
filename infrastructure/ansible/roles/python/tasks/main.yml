@@ -59,3 +59,37 @@
       - chromium
       - chromium-driver
     state: present
+
+- name: Create systemd service for DNS measurements
+  copy:
+    dest: /etc/systemd/system/dns-webclient-measure.service
+    content: |
+      [Unit]
+      Description=DNS Measurement Script
+      After=network.target
+
+      [Service]
+      ExecStart=/opt/dns/venv/bin/python /opt/dns/webclient.py
+
+      # Realtime + Pinning
+      CPUSchedulingPolicy=fifo
+      CPUSchedulingPriority=99
+      CPUAffinity=1
+      Nice=-20
+      LimitRTPRIO=99
+
+      WorkingDirectory=/opt/dns
+      StandardOutput=append:/var/log/dns/dns-webclient-measure.log
+
+      User=root
+      Type=oneshot
+      RemainAfterExit=no
+
+      [Install]
+      WantedBy=multi-user.target
+  mode: "0644"
+
+- name: Enable dns-measure service
+  systemd:
+    name: dns-measure
+    enabled: true
