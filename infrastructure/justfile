@@ -23,3 +23,7 @@ start:
     cd ./vagrant && vagrant up
     cd ./vagrant && ./create_inventory.sh
     ansible-playbook -i ./vagrant/hosts_dynamic.ini ./ansible/playbook.yml
+
+
+deploy-dg:
+    ansible-playbook -i ./ansible/dg_iinventory.yml ./ansible/playbook.yml
